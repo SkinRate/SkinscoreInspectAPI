@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  skinscore-inspect-postgres:
+    image: postgres:16
+    container_name: skinscore-inspect-postgres
+    command: ["postgres", "-c", "port=${DB_PORT:-5440}"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-SkinscoreInspectApiDatabase}
+      POSTGRES_USER: ${POSTGRES_USER:-skinscore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "${DB_PORT:-5440}:${DB_PORT:-5440}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skinscore} -d ${POSTGRES_DB:-SkinscoreInspectApiDatabase} -h 127.0.0.1 -p ${DB_PORT:-5440}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - skinscoreNetworkShared
+
+  skinscore-inspect-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: skinscore-inspect-api
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      # ✅ use the service name 'skinscore-inspect-postgres' as host; removed extra "}"
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-skinscore}:${POSTGRES_PASSWORD:-changeme}@skinscore-inspect-postgres:${DB_PORT:-5440}/${POSTGRES_DB:-SkinscoreInspectApiDatabase}}
+      APP_PORT: ${APP_PORT:-2855}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+    volumes:
+      - ./config:/config:rw
+    ports:
+      - "${APP_PORT:-2855}:${APP_PORT:-2855}"
+    depends_on:
+      skinscore-inspect-postgres:
+        condition: service_healthy
+    networks:
+      - skinscoreNetworkShared
+
+volumes:
+  pgdata:
+
+networks:
+  skinscoreNetworkShared:
+    external: true
+    name: skinscoreNetworkShared

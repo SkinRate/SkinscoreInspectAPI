@@ -325,3 +325,41 @@ CSGOFloat config file location
 ### `-s`/`--steam_data` (default [node-steam-user config directory](https://github.com/DoctorMcKay/node-steam-user#datadirectory))
 
 node-steam-user config directory
+
+### IMAGES PROVENANCE
+Images come from the repo: [text](https://github.com/SteamDatabase/GameTracking-CS2)
+# wherever you want to stage assets
+git clone --depth=1 https://github.com/ByMykel/counter-strike-image-tracker.git cs2-images
+rsync -av --delete cs2-images/static/panorama/images/econ/ /var/www/skinscore-cs2/panorama/images/econ/
+# 1) Create the destination tree
+sudo mkdir -p /var/www/skinscore-cs2/panorama/images/econ
+# 2) Copy files (run from anywhere)
+sudo rsync -av --delete \
+  ~/cs2-images/static/panorama/images/econ/ \
+  /var/www/skinscore-cs2/panorama/images/econ/
+## Tip: you can also run rsync from inside ~/cs2-images/static/ and keep the command shorter:
+cd ~/cs2-images/static
+sudo mkdir -p /var/www/skinscore-cs2/panorama/images/econ
+sudo rsync -av --delete panorama/images/econ/ /var/www/skinscore-cs2/panorama/images/econ/
+## Set Permissions for NGINX:
+sudo chown -R www-data:www-data /var/www/skinscore-cs2
+sudo find /var/www/skinscore-cs2 -type d -exec chmod 755 {} \;
+sudo find /var/www/skinscore-cs2 -type f -exec chmod 644 {} \;
+### Test a known file: 
+curl -I https://i.skinscore.app/panorama/images/econ/default_generated/weapon_knife_stiletto_sp_dapple_light_png.png
+### Nightly updates
+# put this in a script, e.g. /usr/local/bin/skinscore-sync-images.sh
+cat <<'EOF' | sudo tee /usr/local/bin/skinscore-sync-images.sh
+#!/usr/bin/env bash
+set -euo pipefail
+cd /home/ubuntu/cs2-images
+git pull --ff-only
+rsync -av --delete static/panorama/ /var/www/skinscore-cs2/panorama/
+EOF
+sudo chmod +x /usr/local/bin/skinscore-sync-images.sh
+
+### cron at 03:00 UTC
+( sudo crontab -l 2>/dev/null; echo "0 3 * * * /usr/local/bin/skinscore-sync-images.sh >/var/log/skinscore-sync.log 2>&1" ) | sudo crontab -
+
+sudo nano /etc/nginx/sites-available/i.skinscore.app
+sudo ln -s /etc/nginx/sites-available/i.skinscore.app /etc/nginx/sites-enabled/i.skinscore.app

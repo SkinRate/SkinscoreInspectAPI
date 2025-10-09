@@ -1,20 +1,17 @@
 FROM node:18.15
 
-# Create app directory
 WORKDIR /usr/src/csgofloat
 
-# Install app dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
-# where available (npm@5+)
 COPY package*.json ./
-
 RUN npm install
 
-# Bundle app source
 COPY . .
+
+# Normalize Windows CRLF -> LF and mark start script executable
+RUN sed -i 's/\r$//' docker_start.sh && chmod +x docker_start.sh
 
 EXPOSE 80
 EXPOSE 443
 VOLUME /config
 
-CMD [ "/bin/bash", "docker_start.sh" ]
+CMD ["/bin/bash", "/usr/src/csgofloat/docker_start.sh"]
