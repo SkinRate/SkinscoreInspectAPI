@@ -364,7 +364,12 @@ sudo chmod +x /usr/local/bin/skinscore-sync-images.sh
 sudo nano /etc/nginx/sites-available/i.skinscore.app
 sudo ln -s /etc/nginx/sites-available/i.skinscore.app /etc/nginx/sites-enabled/i.skinscore.app
 
-# TO RUN ON THE SERVER USE
+# TO RUN USE
 docker compose up -d --build
+
+
+## On the server:
+docker-compose version
+docker-compose up -d --build
 docker logs -f skinscore-inspect-api
 docker logs --since=10m skinscore-inspect-api
