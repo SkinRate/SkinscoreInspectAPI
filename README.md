@@ -327,24 +327,29 @@ CSGOFloat config file location
 node-steam-user config directory
 
 ### IMAGES PROVENANCE
-Images come from the repo: [text](https://github.com/SteamDatabase/GameTracking-CS2)
+Images come from the repo: https://github.com/SteamDatabase/GameTracking-CS2
+
 # wherever you want to stage assets
+cd ~
 git clone --depth=1 https://github.com/ByMykel/counter-strike-image-tracker.git cs2-images
-rsync -av --delete cs2-images/static/panorama/images/econ/ /var/www/skinscore-cs2/panorama/images/econ/
+
 # 1) Create the destination tree
 sudo mkdir -p /var/www/skinscore-cs2/panorama/images/econ
+
 # 2) Copy files (run from anywhere)
 sudo rsync -av --delete \
-  ~/cs2-images/static/panorama/images/econ/ \
+  /home/ubuntu/cs2-images/static/panorama/images/econ/ \
   /var/www/skinscore-cs2/panorama/images/econ/
-## Tip: you can also run rsync from inside ~/cs2-images/static/ and keep the command shorter:
+
+## Tip: you can also run rsync from inside ~/cs2-images/static and keep the command shorter:
 cd ~/cs2-images/static
-sudo mkdir -p /var/www/skinscore-cs2/panorama/images/econ
 sudo rsync -av --delete panorama/images/econ/ /var/www/skinscore-cs2/panorama/images/econ/
+
 ## Set Permissions for NGINX:
 sudo chown -R www-data:www-data /var/www/skinscore-cs2
 sudo find /var/www/skinscore-cs2 -type d -exec chmod 755 {} \;
 sudo find /var/www/skinscore-cs2 -type f -exec chmod 644 {} \;
+
 ### Test a known file: 
 curl -I https://i.skinscore.app/panorama/images/econ/default_generated/weapon_knife_stiletto_sp_dapple_light_png.png
 ### Nightly updates
