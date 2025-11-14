@@ -352,22 +352,33 @@ sudo find /var/www/skinscore-cs2 -type f -exec chmod 644 {} \;
 
 ### Test a known file: 
 curl -I https://i.skinscore.app/panorama/images/econ/default_generated/weapon_knife_stiletto_sp_dapple_light_png.png
+
 ### Nightly updates
 # put this in a script, e.g. /usr/local/bin/skinscore-sync-images.sh
 cat <<'EOF' | sudo tee /usr/local/bin/skinscore-sync-images.sh
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd /home/ubuntu/cs2-images
-git pull --ff-only
+
+# Ensure it's a git repo
+if [ ! -d .git ]; then
+  echo "cs2-images is not a git repo" >&2
+  exit 1
+fi
+
+# Force local main to match origin/main, even after forced pushes
+git fetch origin main
+git reset --hard origin/main
+
+# Sync all panorama assets (econ and others)
 rsync -av --delete static/panorama/ /var/www/skinscore-cs2/panorama/
 EOF
+
 sudo chmod +x /usr/local/bin/skinscore-sync-images.sh
 
 ### cron at 03:00 UTC
 ( sudo crontab -l 2>/dev/null; echo "0 3 * * * /usr/local/bin/skinscore-sync-images.sh >/var/log/skinscore-sync.log 2>&1" ) | sudo crontab -
-
-sudo nano /etc/nginx/sites-available/i.skinscore.app
-sudo ln -s /etc/nginx/sites-available/i.skinscore.app /etc/nginx/sites-enabled/i.skinscore.app
 
 # TO RUN USE
 docker compose up -d --build
