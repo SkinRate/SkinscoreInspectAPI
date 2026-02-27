@@ -34,23 +34,39 @@ if (args.steam_data) {
     CONFIG.bot_settings.steam_user.dataDirectory = args.steam_data;
 }
 
-for (let [i, loginData] of CONFIG.logins.entries()) {
-    const settings = Object.assign({}, CONFIG.bot_settings);
-    if (CONFIG.proxies && CONFIG.proxies.length > 0) {
-        const proxy = CONFIG.proxies[i % CONFIG.proxies.length];
+// Crash handlers — prevent one bot error from killing all bots
+process.on('uncaughtException', (err) => {
+    winston.error(`Uncaught Exception: ${err.message}`, { stack: err.stack });
+});
+process.on('unhandledRejection', (reason) => {
+    winston.error(`Unhandled Rejection: ${reason}`, { stack: reason?.stack });
+});
 
-        if (proxy.startsWith('http://')) {
-            settings.steam_user = Object.assign({}, settings.steam_user, {httpProxy: proxy});
-        } else if (proxy.startsWith('socks5://')) {
-            settings.steam_user = Object.assign({}, settings.steam_user, {socksProxy: proxy});
-        } else {
-            console.log(`Invalid proxy '${proxy}' in config, must prefix with http:// or socks5://`);
-            process.exit(1);
+// Staggered bot login — 2 second delay between each bot to avoid Steam rate limits
+(async () => {
+    for (let [i, loginData] of CONFIG.logins.entries()) {
+        const settings = Object.assign({}, CONFIG.bot_settings);
+        if (CONFIG.proxies && CONFIG.proxies.length > 0) {
+            const proxy = CONFIG.proxies[i % CONFIG.proxies.length];
+
+            if (proxy.startsWith('http://')) {
+                settings.steam_user = Object.assign({}, settings.steam_user, {httpProxy: proxy});
+            } else if (proxy.startsWith('socks5://')) {
+                settings.steam_user = Object.assign({}, settings.steam_user, {socksProxy: proxy});
+            } else {
+                console.log(`Invalid proxy '${proxy}' in config, must prefix with http:// or socks5://`);
+                process.exit(1);
+            }
+        }
+
+        botController.addBot(loginData, settings);
+        if (i < CONFIG.logins.length - 1) {
+            winston.info(`Bot ${i + 1}/${CONFIG.logins.length} added, waiting 2s before next...`);
+            await new Promise(r => setTimeout(r, 2000));
         }
     }
-
-    botController.addBot(loginData, settings);
-}
+    winston.info(`All ${CONFIG.logins.length} bot(s) added.`);
+})();
 
 postgres.connect();
 

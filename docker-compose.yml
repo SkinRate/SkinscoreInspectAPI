@@ -33,6 +33,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-skinscore}:${POSTGRES_PASSWORD:-changeme}@skinscore-inspect-postgres:${DB_PORT:-5440}/${POSTGRES_DB:-SkinscoreInspectApiDatabase}}
       APP_PORT: ${APP_PORT:-2855}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      BOTS_FILE: /config/bots.json
     volumes:
       - ./config:/config:rw
     ports:
