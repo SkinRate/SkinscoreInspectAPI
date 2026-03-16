@@ -12,6 +12,7 @@ const winston = require('winston'),
     utils = require('./lib/utils'),
     queue = new (require('./lib/queue'))(),
     InspectURL = require('./lib/inspect_url'),
+    { decodeMaskedHex } = require('./lib/masked_decoder'),
     botController = new (require('./lib/bot_controller'))(),
     CONFIG = require(args.config),
     postgres = new (require('./lib/postgres'))(CONFIG.database_url, CONFIG.enable_bulk_inserts),
@@ -72,6 +73,21 @@ postgres.connect();
 
 // Setup and configure express
 const app = require('express')();
+
+// Override query parser: don't convert '+' to space so inspect links like
+// steam://run/730//+csgo_econ_action_preview%20HEX work without manual encoding
+app.set('query parser', (str) => require('qs').parse(str, {
+    decoder(s, defaultDecoder, _charset, type) {
+        if (type === 'value') {
+            try { return decodeURIComponent(s); } catch (e) { return s; }
+        }
+        return defaultDecoder(s);
+    }
+}));
+app.use(function (req, res, next) {
+    winston.debug(`RAW_URL: ${req.method} ${req.url}`);
+    next();
+});
 app.use(function (req, res, next) {
     if (req.method === 'POST') {
         // Default content-type
@@ -177,6 +193,16 @@ app.get('/', function(req, res) {
         return errors.InvalidInspect.respond(res);
     }
 
+    // New masked format — decode locally, no GC needed
+    if (link.masked) {
+        const iteminfo = decodeMaskedHex(link.hex);
+        if (!iteminfo) return errors.InvalidInspect.respond(res);
+        gameData.addAdditionalItemProperties(iteminfo);
+        iteminfo.stickers = iteminfo.stickers.map(s => utils.removeNullValues(s));
+        iteminfo.keychains = iteminfo.keychains.map(k => utils.removeNullValues(k));
+        return res.json({ iteminfo: utils.removeNullValues(iteminfo) });
+    }
+
     const job = new Job(req, res, /* bulk */ false);
 
     let price;
@@ -210,10 +236,23 @@ app.post('/bulk', (req, res) => {
 
     const job = new Job(req, res, /* bulk */ true);
 
+    const maskedResults = {};
+
     for (const data of req.body.links) {
         const link = new InspectURL(data.link);
         if (!link.valid) {
             return errors.InvalidInspect.respond(res);
+        }
+
+        // New masked format — decode locally, no GC needed
+        if (link.masked) {
+            const iteminfo = decodeMaskedHex(link.hex);
+            if (!iteminfo) return errors.InvalidInspect.respond(res);
+            gameData.addAdditionalItemProperties(iteminfo);
+            iteminfo.stickers = iteminfo.stickers.map(s => utils.removeNullValues(s));
+            iteminfo.keychains = iteminfo.keychains.map(k => utils.removeNullValues(k));
+            maskedResults[link.hex] = utils.removeNullValues(iteminfo);
+            continue;
         }
 
         let price;
@@ -223,6 +262,11 @@ app.post('/bulk', (req, res) => {
         }
 
         job.add(link, price);
+    }
+
+    // If all links were masked, respond immediately
+    if (job.remainingSize() === 0 && Object.keys(maskedResults).length > 0) {
+        return res.json(maskedResults);
     }
 
     try {
